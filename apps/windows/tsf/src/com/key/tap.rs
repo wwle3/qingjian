@@ -1,7 +1,7 @@
 //! 单击中 / 英切换键的判定，喂的是击键 sink 的 `OnTestKeyDown` / `OnTestKeyUp`（被吃掉的键也经过它们，
 //! 与 `WH_KEYBOARD` 钩子不同）。按下切换键到抬起之间没插进别的键，就是一次单击。
 //!
-//! 切换键来自 `[shortcut] switch_mode`，单击 Shift / 单击 Ctrl 可以都勾；Ctrl + Alt + Space 是组合键，走保留键。
+//! 切换键来自 `[shortcut] switch_mode`，单击 Shift / 单击 Ctrl 可以都勾；Ctrl + Alt + Space 与 Ctrl + Shift + Space 是组合键，走保留键。
 //! 系统热键（如 Ctrl + Space）的第二个键被系统截走、到不了这里，看起来就像单击了 Ctrl：
 //! 系统热键生效时调 [`KeyTap::cancel`] 作废这次按下。
 
@@ -57,7 +57,7 @@ impl KeyTap {
     }
 }
 
-/// 这个虚拟键码是不是勾着的单击切换键（左右两个都算）；组合键 Ctrl + Alt + Space 不走单击判定。
+/// 这个虚拟键码是不是勾着的单击切换键（左右两个都算）；Ctrl + Alt / Shift + Space 不走单击判定。
 fn tap_key(keys: SwitchKeys, vk: u32) -> Option<SwitchKey> {
     let is = |codes: [u16; 3]| codes.iter().any(|code| u32::from(*code) == vk);
     if keys.shift && is([VK_SHIFT.0, VK_LSHIFT.0, VK_RSHIFT.0]) {
@@ -106,7 +106,11 @@ mod tests {
         assert!(tap.key_up(VK_CONTROL_LEFT, keys));
 
         // 一个都不勾、只勾组合键：修饰键单击都不算
-        for keys in [SwitchKeys::NONE, only(SwitchKey::CtrlAltSpace)] {
+        for keys in [
+            SwitchKeys::NONE,
+            only(SwitchKey::CtrlAltSpace),
+            only(SwitchKey::CtrlShiftSpace),
+        ] {
             tap.key_down(VK_SHIFT_LEFT, DOWN, keys);
             assert!(!tap.key_up(VK_SHIFT_LEFT, keys));
             tap.key_down(VK_CONTROL_LEFT, DOWN, keys);

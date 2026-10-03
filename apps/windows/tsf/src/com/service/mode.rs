@@ -4,10 +4,11 @@
 //! 指示器走语言栏按钮 + 转换模式 compartment；用户点任务栏中 / 英由 compartment 回调反向同步。
 //! 切换键与内置英文模式开关由 Server 经协议下发（[`TextService_Impl::apply_input_settings`]），DLL 不读配置文件。
 
+use std::cell::Cell;
 use std::time::Instant;
 
 use windows::Win32::UI::TextServices::{ITfKeystrokeMgr, ITfLangBarItemMgr};
-use windows::core::Interface;
+use windows::core::{Interface, Result};
 
 use qingjian_platform::SwitchKeys;
 use qingjian_platform::protocol::InputSettings;
@@ -46,7 +47,20 @@ impl TextService_Impl {
                 self.remove_lang_bar_item();
             }
         }
-        self.sync_switch_preserved_key(switch_keys.ctrl_alt_space);
+        self.sync_switch_preserved_key(
+            switch_keys.ctrl_alt_space,
+            &self.switch_preserved,
+            preserved::register_switch_mode,
+            preserved::unregister_switch_mode,
+            "Ctrl + Alt + Space",
+        );
+        self.sync_switch_preserved_key(
+            switch_keys.ctrl_shift_space,
+            &self.switch_shift_preserved,
+            preserved::register_switch_shift_space,
+            preserved::unregister_switch_shift_space,
+            "Ctrl + Shift + Space",
+        );
     }
 
     /// `Activate` 是否已经走完（[`super::ACTIVE`] 在它末尾才设）。
@@ -70,9 +84,16 @@ impl TextService_Impl {
         self.apply_mode_settings(input.english_mode, input.switch_mode);
     }
 
-    /// Ctrl + Alt + Space 是组合键、走 TSF 保留键（与「翻译选中文字」同一套）；没勾就撤掉登记，免得白占着。
-    fn sync_switch_preserved_key(&self, want: bool) {
-        if want == self.switch_preserved.get() {
+    /// 组合键走 TSF 保留键（与「翻译选中文字」同一套）；没勾就撤掉登记，免得白占着。
+    fn sync_switch_preserved_key(
+        &self,
+        want: bool,
+        registered: &Cell<bool>,
+        register: fn(&ITfKeystrokeMgr, u32) -> Result<()>,
+        unregister: fn(&ITfKeystrokeMgr),
+        name: &str,
+    ) {
+        if want == registered.get() {
             return;
         }
         let Some(thread_mgr) = self.thread_mgr.borrow().clone() else {
@@ -82,23 +103,26 @@ impl TextService_Impl {
             return;
         };
         if want {
-            match preserved::register_switch_mode(&keystroke, self.client_id.get()) {
+            match register(&keystroke, self.client_id.get()) {
                 Ok(()) => {
-                    self.switch_preserved.set(true);
-                    log("中英切换键 Ctrl + Alt + Space 已登记为保留键");
+                    registered.set(true);
+                    log(&format!("中英切换键 {name} 已登记为保留键"));
                 }
-                Err(error) => log(&format!("登记 Ctrl + Alt + Space 切换键失败: {error}")),
+                Err(error) => log(&format!("登记 {name} 切换键失败: {error}")),
             }
         } else {
-            preserved::unregister_switch_mode(&keystroke);
-            self.switch_preserved.set(false);
+            unregister(&keystroke);
+            registered.set(false);
         }
     }
 
-    /// 停用时撤掉 Ctrl + Alt + Space 的保留键登记。
+    /// 停用时撤掉中英切换组合键的保留键登记。
     pub(super) fn drop_switch_preserved_key(&self, keystroke: &ITfKeystrokeMgr) {
         if self.switch_preserved.replace(false) {
             preserved::unregister_switch_mode(keystroke);
+        }
+        if self.switch_shift_preserved.replace(false) {
+            preserved::unregister_switch_shift_space(keystroke);
         }
     }
 

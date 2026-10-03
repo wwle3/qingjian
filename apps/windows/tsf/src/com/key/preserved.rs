@@ -1,4 +1,4 @@
-//! 「翻译选中文字」与「Ctrl + Alt + Space 切换中英」两个快捷键登记成 TSF **保留键**（preserved key）。
+//! 「翻译选中文字」与中英切换组合键（Ctrl + Alt + Space、Ctrl + Shift + Space）登记成 TSF **保留键**（preserved key）。
 //! 带 Alt 的组合是系统键，不经击键 sink（真机：Ctrl+Alt+T 在 `OnTestKeyDown` 里从没出现过）；
 //! 保留键由 TSF 在应用之前匹配、回调 `OnPreservedKey`，UWP 里也一样。翻译组合来自
 //! `[shortcut] translate_selection`，激活时读一次配置（AppContainer 读不到用户目录时用缺省 Ctrl+Alt+T）；
@@ -21,6 +21,10 @@ pub(crate) const GUID_TRANSLATE: GUID = GUID::from_u128(0x5c0a7b12_3d4e_4f60_8a9
 /// Ctrl + Alt + Space 中英切换键的保留键标识。
 pub(crate) const GUID_SWITCH_MODE: GUID = GUID::from_u128(0x2f6b8c51_9a34_4e7d_b2c8_5d1e0f3a7b64);
 
+/// Ctrl + Shift + Space 中英切换键的保留键标识。
+pub(crate) const GUID_SWITCH_SHIFT_SPACE: GUID =
+    GUID::from_u128(0x8c1d4e72_6b05_4a93_9f17_3e2a8c5d0b41);
+
 /// msctf.h 的 `TF_MOD_LWIN`（windows crate 没导出）。
 const TF_MOD_LWIN: u32 = 0x08;
 
@@ -38,23 +42,55 @@ pub(crate) fn load_combo() -> KeyCombo {
     }
 }
 
-/// Ctrl + Alt + Space 的 `TF_PRESERVEDKEY`。不用 Ctrl + Space：中文 Windows 把它绑成系统的
-/// 「输入法/非输入法切换」，系统先截走，保留键收不到。
-fn switch_mode_key() -> TF_PRESERVEDKEY {
+fn space_key(modifiers: u32) -> TF_PRESERVEDKEY {
     TF_PRESERVEDKEY {
         uVKey: VK_SPACE.0 as u32,
-        uModifiers: TF_MOD_CONTROL | TF_MOD_ALT,
+        uModifiers: modifiers,
     }
 }
 
-/// 登记 Ctrl + Alt + Space 为中英切换保留键（`switch_mode` 勾了它时）。
-pub(crate) fn register_switch_mode(keystroke: &ITfKeystrokeMgr, tid: u32) -> Result<()> {
+fn register_space(keystroke: &ITfKeystrokeMgr, tid: u32, guid: &GUID, modifiers: u32) -> Result<()> {
+    let key = space_key(modifiers);
     let description: Vec<u16> = "切换中英文（青简）".encode_utf16().collect();
-    unsafe { keystroke.PreserveKey(tid, &GUID_SWITCH_MODE, &switch_mode_key(), &description) }
+    unsafe { keystroke.PreserveKey(tid, guid, &key, &description) }
+}
+
+fn unregister_space(keystroke: &ITfKeystrokeMgr, guid: &GUID, modifiers: u32) {
+    let key = space_key(modifiers);
+    let _ = unsafe { keystroke.UnpreserveKey(guid, &key) };
+}
+
+/// 登记 Ctrl + Alt + Space 为中英切换保留键（`switch_mode` 勾了它时）。
+/// 不用 Ctrl + Space：中文 Windows 把它绑成系统的「输入法/非输入法切换」，系统先截走，保留键收不到。
+pub(crate) fn register_switch_mode(keystroke: &ITfKeystrokeMgr, tid: u32) -> Result<()> {
+    register_space(
+        keystroke,
+        tid,
+        &GUID_SWITCH_MODE,
+        TF_MOD_CONTROL | TF_MOD_ALT,
+    )
 }
 
 pub(crate) fn unregister_switch_mode(keystroke: &ITfKeystrokeMgr) {
-    let _ = unsafe { keystroke.UnpreserveKey(&GUID_SWITCH_MODE, &switch_mode_key()) };
+    unregister_space(keystroke, &GUID_SWITCH_MODE, TF_MOD_CONTROL | TF_MOD_ALT);
+}
+
+/// 登记 Ctrl + Shift + Space。Ctrl + Shift 单独松开是系统换键盘布局的热键，这条要的是再加 Space。
+pub(crate) fn register_switch_shift_space(keystroke: &ITfKeystrokeMgr, tid: u32) -> Result<()> {
+    register_space(
+        keystroke,
+        tid,
+        &GUID_SWITCH_SHIFT_SPACE,
+        TF_MOD_CONTROL | TF_MOD_SHIFT,
+    )
+}
+
+pub(crate) fn unregister_switch_shift_space(keystroke: &ITfKeystrokeMgr) {
+    unregister_space(
+        keystroke,
+        &GUID_SWITCH_SHIFT_SPACE,
+        TF_MOD_CONTROL | TF_MOD_SHIFT,
+    );
 }
 
 fn preserved_key(combo: KeyCombo) -> TF_PRESERVEDKEY {

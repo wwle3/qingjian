@@ -407,7 +407,7 @@ CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但�
   DLL 用最近收键记下的 `ITfContext` 经编辑会话落进文档；应用强行终止组句（`OnCompositionTerminated`）时拼音已被框架定成普通文本，
   DLL 只记「Server 缓冲过期」，下次说话前先 `Commit` 并丢掉交出的文本，不再插一次。
   中英模式：**Windows 与 macOS 机制不同**。macOS 用 Caps Lock 当中英切换键；Windows 按本地习惯，单击切换键在中 / 英间翻转，
-  切换键由 `[shortcut] switch_mode` 勾选（`SwitchKeys`：单击 `shift`（缺省）/ 单击 `control` / `ctrl+alt+space`，可多选，空列表 = 不用键切），
+  切换键由 `[shortcut] switch_mode` 勾选（`SwitchKeys`：单击 `shift`（缺省）/ 单击 `control` / `ctrl+alt+space` / `ctrl+shift+space`，可多选，空列表 = 不用键切），
   `[general] english_mode` 关掉则整个内置英文模式停用（issue #81）。**模式全局一份、存在 Server**（`Router.english`，与搜狗一致）：
   DLL 里用户切了（切换键、语言栏按钮、右键菜单、任务栏转换模式）用 `ModeChanged` 报上去；激活、线程得到焦点（`com/focus.rs` 的
   `ITfThreadFocusSink`，切窗口时 `ITfKeyEventSink::OnSetFocus` 不触发）和每隔几拍的轮询用 `SyncMode` 取回并跟上
@@ -420,7 +420,7 @@ CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但�
   切换键、英文模式开关与「Shift 字母进组句」由 **Server 读配置、经协议下发**（`protocol::InputSettings`：`OpenSession` 的回包
   `SessionOpened` 带一次，之后每拍 `SyncMode` 跟着走，值变了就地应用，**设置窗口改完约 320 ms 内生效**，不必切走再切回输入法）；
   DLL 不读配置文件——它跑在每个应用进程里，AppContainer 里的商店应用连 `%APPDATA%` 都读不到。
-  `ctrl+alt+space` 是组合键、属系统键不经击键 sink，与翻译快捷键一样登记成 TSF 保留键（`com/key/preserved.rs` 的 `GUID_SWITCH_MODE`）。
+  `ctrl+alt+space` 与 `ctrl+shift+space` 是组合键，与翻译快捷键一样登记成 TSF 保留键（`com/key/preserved.rs` 的 `GUID_SWITCH_MODE` / `GUID_SWITCH_SHIFT_SPACE`）。带 Alt 的组合不经击键 sink。
   勾选项里没有 Ctrl + Space：中文 Windows 把它绑成系统的「输入法/非输入法切换」（`IME_CHOTKEY_IME_NONIME_TOGGLE`），系统先截走、保留键收不到。
   但我们**适配**这条系统热键（与微软拼音一致，不进勾选项）：它翻的是「输入法开 / 关」compartment（`GUID_COMPARTMENT_KEYBOARD_OPENCLOSE`），
   `com/mode/sink.rs` 监听它（`sync_from_keyboard_open`）：关 = 英文、开 = 中文，照样报给 Server 成为全局模式。反向由 `refresh_mode_indicator`

@@ -64,7 +64,7 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
     fn OnPreservedKey(&self, pic: Ref<ITfContext>, rguid: *const GUID) -> Result<BOOL> {
         let guid = unsafe { *rguid };
         log(&format!("保留键命中 guid={guid:?}"));
-        if guid == preserved::GUID_SWITCH_MODE {
+        if guid == preserved::GUID_SWITCH_MODE || guid == preserved::GUID_SWITCH_SHIFT_SPACE {
             if self.keyboard_disabled(&pic) {
                 return Ok(FALSE);
             }

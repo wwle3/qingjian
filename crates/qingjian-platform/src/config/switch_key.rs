@@ -2,8 +2,8 @@ use serde::de::{self, Deserializer, SeqAccess, Visitor};
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 
-/// 一个中 / 英切换键（Windows）。`shift` / `control` 是**单击**那个修饰键；`ctrl+alt+space` 是组合键
-/// （走 TSF 保留键登记，与「翻译选中文字」同一套机制）。macOS 的切换键是 Caps Lock，本项不生效。
+/// 一个中 / 英切换键（Windows）。`shift` / `control` 是**单击**那个修饰键；`ctrl+alt+space` 与
+/// `ctrl+shift+space` 是组合键（走 TSF 保留键登记，与「翻译选中文字」同一套机制）。macOS 的切换键是 Caps Lock，本项不生效。
 ///
 /// 不用 Ctrl + Space：中文 Windows 把它绑成系统的「输入法/非输入法切换」，系统先截走，输入法拿不到。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,11 +16,19 @@ pub enum SwitchKey {
 
     /// Ctrl + Alt + Space 组合键，最不容易误触。
     CtrlAltSpace,
+
+    /// Ctrl + Shift + Space 组合键。
+    CtrlShiftSpace,
 }
 
 impl SwitchKey {
     /// 全部取值，设置界面按这个顺序列出。
-    pub const ALL: [Self; 3] = [Self::Shift, Self::Control, Self::CtrlAltSpace];
+    pub const ALL: [Self; 4] = [
+        Self::Shift,
+        Self::Control,
+        Self::CtrlAltSpace,
+        Self::CtrlShiftSpace,
+    ];
 
     /// 配置文件里的写法。
     pub const fn key(self) -> &'static str {
@@ -28,6 +36,7 @@ impl SwitchKey {
             Self::Shift => "shift",
             Self::Control => "control",
             Self::CtrlAltSpace => "ctrl+alt+space",
+            Self::CtrlShiftSpace => "ctrl+shift+space",
         }
     }
 
@@ -37,6 +46,7 @@ impl SwitchKey {
             Self::Shift => "单击 Shift",
             Self::Control => "单击 Ctrl",
             Self::CtrlAltSpace => "Ctrl + Alt + Space",
+            Self::CtrlShiftSpace => "Ctrl + Shift + Space",
         }
     }
 
@@ -48,6 +58,7 @@ impl SwitchKey {
             "ctrl+alt+space" | "control+alt+space" | "ctrl+space" | "control+space" => {
                 Some(Self::CtrlAltSpace)
             }
+            "ctrl+shift+space" | "control+shift+space" => Some(Self::CtrlShiftSpace),
             _ => None,
         }
     }
@@ -61,6 +72,7 @@ pub struct SwitchKeys {
     pub shift: bool,
     pub control: bool,
     pub ctrl_alt_space: bool,
+    pub ctrl_shift_space: bool,
 }
 
 impl Default for SwitchKeys {
@@ -76,6 +88,7 @@ impl SwitchKeys {
         shift: false,
         control: false,
         ctrl_alt_space: false,
+        ctrl_shift_space: false,
     };
 
     pub const fn contains(self, key: SwitchKey) -> bool {
@@ -83,6 +96,7 @@ impl SwitchKeys {
             SwitchKey::Shift => self.shift,
             SwitchKey::Control => self.control,
             SwitchKey::CtrlAltSpace => self.ctrl_alt_space,
+            SwitchKey::CtrlShiftSpace => self.ctrl_shift_space,
         }
     }
 
@@ -92,6 +106,7 @@ impl SwitchKeys {
             SwitchKey::Shift => self.shift = on,
             SwitchKey::Control => self.control = on,
             SwitchKey::CtrlAltSpace => self.ctrl_alt_space = on,
+            SwitchKey::CtrlShiftSpace => self.ctrl_shift_space = on,
         }
         self
     }
@@ -196,6 +211,9 @@ mod tests {
         let chord = SwitchKeys::NONE.with(SwitchKey::CtrlAltSpace, true);
         assert_eq!(parse(r#""ctrl+space""#).unwrap(), chord);
         assert_eq!(parse(r#"["ctrl+alt+space"]"#).unwrap(), chord);
+        let shift_space = SwitchKeys::NONE.with(SwitchKey::CtrlShiftSpace, true);
+        assert_eq!(parse(r#"["ctrl+shift+space"]"#).unwrap(), shift_space);
+        assert_eq!(parse(r#""control+shift+space""#).unwrap(), shift_space);
         assert_eq!(SwitchKeys::default(), shift);
     }
 

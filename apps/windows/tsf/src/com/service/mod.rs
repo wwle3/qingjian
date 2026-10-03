@@ -85,6 +85,9 @@ pub struct TextService {
     /// Ctrl + Alt + Space 切换键当前是否已登记为保留键（`[shortcut] switch_mode` 勾了它时才有）。
     switch_preserved: Cell<bool>,
 
+    /// Ctrl + Shift + Space 切换键当前是否已登记为保留键。
+    switch_shift_preserved: Cell<bool>,
+
     /// 上一次应用过的按键行为设置；与 Server 下发的一致时就不重复应用
     /// （每一拍 `SyncMode` 都带着它，见 [`TextService_Impl::apply_input_settings`]）。
     input_settings: Cell<Option<InputSettings>>,
@@ -175,6 +178,7 @@ impl TextService {
             profile_cookie: Cell::new(None),
             translate_combo: Cell::new(None),
             switch_preserved: Cell::new(false),
+            switch_shift_preserved: Cell::new(false),
             input_settings: Cell::new(None),
             indicator_state: Cell::new(IndicatorState::default()),
             conversion_guard_until: Cell::new(None),
