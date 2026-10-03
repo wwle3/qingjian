@@ -67,11 +67,12 @@ cargo 命令全 `--locked`（含 `bundle.sh` 与 `build.ps1`）。普通 CI 只�
 发版门禁（`release.yml` 第一步）：版本号与标签一致且不带 `-dev`；标签指向的提交必须在 `main` 上（`git merge-base --is-ancestor`）；产品数据下载后按 `data` Release 的 `SHA256SUMS` 校验，摘要写进 `build-info.json` 的 `data_sha256`。
 **正式版前还欠**：产品数据改成不可变 tag 并在仓库里锁定版本（现在滚动覆盖，同一源码 tag 重跑可能拿到不同数据）、安装包内容验证（词库 / 模型 / 许可齐不齐、签名校验）。
 
-## 两个 workflow
+## 三个 workflow
 
 | 文件 | 触发 | 做什么 |
 |---|---|---|
 | `.github/workflows/ci.yml` | push main、PR | Linux 上 `cargo fmt --check` / clippy / test，排除 `qingjian-macos`（IMK 外壳只能在 macOS 编译，macOS runner 计费是 Linux 的 10 倍） |
+| `.github/workflows/windows-build.yml` | Actions 页手动 | 只打 Windows 安装包并挂到该次 run 的 artifact。不建 Release、不签 `releases.json`，没有索引签名密钥也能跑 |
 | `.github/workflows/release.yml` | 推 `v*`（三个平台）或 `macos-v*` / `windows-v*` / `linux-v*`（单平台）标签 | `prepare` 门禁并建草稿 Release → `macos` / `windows` / `linux` 并行打包上传 → `publish` 合并摘要、转正、生成 `releases.json`、触发官网构建（见上文） |
 
 ## 产品数据从哪来

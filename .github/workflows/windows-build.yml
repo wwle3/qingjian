@@ -1,0 +1,63 @@
+# 手动打 Windows 安装包。不建 Release、不签 releases.json，所以 fork 上没有索引签名密钥也能跑。
+# 成品挂在这次 run 的 artifact 上。不签名、关 uiAccess，与 release.yml 的 Windows 包一样。
+name: windows-build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # 没有代码签名：Server 不带 uiAccess，否则没签名的 exe 起不来。
+  QINGJIAN_UIACCESS: '0'
+  PYTHON: python
+  PYTHONUTF8: '1'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
+        with:
+          toolchain: 1.96.0
+          targets: i686-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Fetch product data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools/release/data-fetch.sh
+          ls -la data/generated data/generated/dicts data/models/hanzhang-zhiwei data/models/hanzhang-tongbian
+
+      - name: Install Inno Setup 7.1.0
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe'
+          $expected = '0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f'
+          $exe = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
+          Invoke-WebRequest -Uri $url -OutFile $exe
+          $actual = (Get-FileHash -Path $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "Inno Setup 安装程序 SHA-256 不符：$actual" }
+          Start-Process -FilePath $exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait
+          & "${env:ProgramFiles}\Inno Setup 7\ISCC.exe" --version
+
+      - name: Build installer
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps\windows\installer\build.ps1
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-installer
+          path: target/installer/*.exe
+          if-no-files-found: error
